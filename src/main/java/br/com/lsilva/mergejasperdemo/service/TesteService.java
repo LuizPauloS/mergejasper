@@ -107,11 +107,12 @@ public class TesteService {
         document.add(new AreaBreak());
         Paragraph p = new Paragraph("Table of Contents")
                 .setFont(bold)
-                .setDestination("toc")
                 .add(new Tab());
         document.add(p);
+
         List<TabStop> tabStops = new ArrayList<>();
         tabStops.add(new TabStop(580, TabAlignment.RIGHT, new DottedLine()));
+
         for (SimpleEntry<String, SimpleEntry<String, Integer>> entry : toc) {
             SimpleEntry<String, Integer> text = entry.getValue();
             p = new Paragraph()
@@ -132,9 +133,7 @@ public class TesteService {
                 null, 1);
         pdfDoc.getPage(2).setPageLabel(PageLabelNumberingStyle.DECIMAL_ARABIC_NUMERALS,
                 null, 1);
-
         document.close();
-
         return byteOutputStream.toByteArray();
     }
 
@@ -155,14 +154,12 @@ public class TesteService {
                     String name = String.format("title%02d", counter++);
                     outline = createOutline(outline, pdfDocument, line, name);
                     SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
-                    p
-                            .setFont(titleFont)
-                            .setFontSize(12)
-                            .setKeepWithNext(true)
-                            .setDestination(name)
-
-                            // Add the current page number to the table of contents list
-                            .setNextRenderer(new UpdatePageRenderer(p, titlePage));
+                    p.setFont(titleFont)
+                        .setFontSize(12)
+                        .setKeepWithNext(true)
+                        .setDestination(name)
+                        // Add the current page number to the table of contents list
+                        .setNextRenderer(new UpdatePageRenderer(p, titlePage));
                     document.add(p);
                     toc.add(new SimpleEntry(name, titlePage));
                     title = false;
@@ -209,4 +206,57 @@ public class TesteService {
             return result;
         }
     }
+
+//    public byte[] merge(byte[]... documents) {
+//        ByteArrayOutputStream result = null;
+//        try {
+//            result = new ByteArrayOutputStream();
+//            PdfCopyFields copy = new PdfCopyFields(result);
+//            for (byte[] document: documents) {
+//
+//                InputStream is = new BufferedInputStream(new ByteArrayInputStream(document));
+//                String mimeType = URLConnection.guessContentTypeFromStream(is);
+//                PdfReader pdfReader = null;
+//
+//                if(mimeType == null) {
+//
+//                    pdfReader = new PdfReader(document);
+//
+//                } else if(mimeType.endsWith("jpg") || mimeType.endsWith("png")) {
+//                    final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+//
+//                    final Document imageDocument = new Document(PageSize.A4);
+//                    PdfWriter pdfWriter = PdfWriter.getInstance(imageDocument, byteStream);
+//                    imageDocument.open();
+//
+//                    // Create single page with the dimensions as source image and no margins:
+//                    Image image = Image.getInstance(document);
+//                    image.scaleToFit(550, 500);
+//                    image.setAbsolutePosition(10, 300);
+//                    imageDocument.add(image);
+//
+//                    imageDocument.close();
+//                    pdfReader = new PdfReader(byteStream.toByteArray());
+//                }
+//                copy.addDocument(pdfReader);
+//            }
+
+//			PdfDocument pdfDoc = new PdfDocument(copy, new PdfWriter(result));
+//            copy.close();
+//			Document doc = new Document(pdfDoc);
+//
+//			int numberOfPages = pdfDoc.getNumberOfPages();
+//			for (int i = 1; i <= numberOfPages; i++) {
+//				// Write aligned text to the specified by parameters point
+//				doc.showTextAligned(new Paragraph(String.format("page %s of %s", i, numberOfPages)),
+//						559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
+//			}
+//			doc.close();
+//            return result.toByteArray();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            logger.error(e.getMessage());
+//            return null;
+//        }
+//    }
 }
