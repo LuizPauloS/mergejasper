@@ -11,14 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/teste")
 @RestController
-public class Teste {
+public class TesteController {
 
     @Autowired
     private TesteService service;
 
     @GetMapping
     public ResponseEntity<?> getPdf() throws Exception {
-        byte[] documento = this.service.createIndexPDF();
+        byte[] documento = this.service.getImagesFormat();
         HttpHeaders headers = new HttpHeaders();
         headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
         headers.add("Pragma", "no-cache");

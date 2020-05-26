@@ -1,31 +1,33 @@
 package br.com.lsilva.mergejasperdemo.service;
 
 import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.*;
 import com.itextpdf.kernel.pdf.action.PdfAction;
 import com.itextpdf.kernel.pdf.canvas.draw.DottedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
 import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.AreaBreak;
-import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Tab;
-import com.itextpdf.layout.element.TabStop;
+import com.itextpdf.layout.element.*;
 import com.itextpdf.layout.layout.LayoutContext;
 import com.itextpdf.layout.layout.LayoutResult;
+import com.itextpdf.layout.property.AreaBreakType;
 import com.itextpdf.layout.property.TabAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.VerticalAlignment;
 import com.itextpdf.layout.renderer.ParagraphRenderer;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.net.URLConnection;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -50,39 +52,30 @@ public class TesteService {
         return byteOutputStream.toByteArray();
     }
 
-//    public byte[] getImagesFormat() throws IOException {
-//        byte[] img = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI()));
-//        byte[] img2 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI()));
-//
-//        List<byte[]> documents = Arrays.asList(img, img2);
-//
-//        for (byte[] image: documents) {
-//            final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-//            PdfDocument pdfDoc = new PdfDocument(new PdfWriter(byteArrayOutputStream));
-//            final Document imageDocument = new Document(pdfDoc);
-//
-//            Image image = new Image(imageDocument);
-//                image.scaleToFit(550, 500);
-//                image.setAbsolutePosition(10, 300);
-//                imageDocument.add(image);
-//
-//                imageDocument.close();
-//                pdfReader = new PdfReader(byteStream.toByteArray());
-//        }
-//
+    public byte[] getImagesFormat() throws IOException {
 //        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-//        PdfDocument pdfDoc = new PdfDocument(new PdfReader(PDF_SRC), new PdfWriter(byteOutputStream));
-//        Document doc = new Document(pdfDoc);
+//        String [] IMAGES = {
+//                new ClassPathResource(IMG_SRC + "cpf.jpg").getPath(),
+//                new ClassPathResource(IMG_SRC + "rg.jpg").getPath()
+//        };
+//        Image image = new Image(ImageDataFactory.create(IMAGES[0]));
+//        PdfDocument pdfDoc = new PdfDocument(new PdfWriter(byteOutputStream));
+//        Document doc = new Document(pdfDoc, PageSize.A4);
 //
-//        int numberOfPages = pdfDoc.getNumberOfPages();
-//        for (int i = 1; i <= numberOfPages; i++) {
-//            // Write aligned text to the specified by parameters point
-//            doc.showTextAligned(new Paragraph(String.format("page %s of %s", i, numberOfPages)),
-//                    559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
+//        for (int i = 0; i < IMAGES.length; i++) {
+//            image = new Image(ImageDataFactory.create(IMAGES[i]));
+//            pdfDoc.addNewPage(PageSize.A4);
+//            //image.setFixedPosition(i + 1, 0, 0);
+//            doc.add(image);
 //        }
+//
 //        doc.close();
 //        return byteOutputStream.toByteArray();
-//    }
+        byte[] img = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI()));
+        byte[] img2 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI()));
+
+        return merge(img, img2);
+    }
 
     public byte[] createIndexPDF() throws Exception {
         ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
@@ -207,56 +200,43 @@ public class TesteService {
         }
     }
 
-//    public byte[] merge(byte[]... documents) {
-//        ByteArrayOutputStream result = null;
-//        try {
-//            result = new ByteArrayOutputStream();
-//            PdfCopyFields copy = new PdfCopyFields(result);
+    public byte[] merge(byte[]... documents) {
+        ByteArrayOutputStream result = null;
+        try {
+            result = new ByteArrayOutputStream();
+            PdfDocument copy = new PdfDocument(new PdfWriter(result));
+            Document imageDocument = null;
 //            for (byte[] document: documents) {
-//
+                for(int i = 0; i <= documents.length; i++) {
+
 //                InputStream is = new BufferedInputStream(new ByteArrayInputStream(document));
 //                String mimeType = URLConnection.guessContentTypeFromStream(is);
 //                PdfReader pdfReader = null;
-//
-//                if(mimeType == null) {
-//
-//                    pdfReader = new PdfReader(document);
-//
-//                } else if(mimeType.endsWith("jpg") || mimeType.endsWith("png")) {
-//                    final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-//
-//                    final Document imageDocument = new Document(PageSize.A4);
-//                    PdfWriter pdfWriter = PdfWriter.getInstance(imageDocument, byteStream);
-//                    imageDocument.open();
-//
-//                    // Create single page with the dimensions as source image and no margins:
-//                    Image image = Image.getInstance(document);
-//                    image.scaleToFit(550, 500);
-//                    image.setAbsolutePosition(10, 300);
-//                    imageDocument.add(image);
-//
-//                    imageDocument.close();
-//                    pdfReader = new PdfReader(byteStream.toByteArray());
-//                }
-//                copy.addDocument(pdfReader);
-//            }
 
-//			PdfDocument pdfDoc = new PdfDocument(copy, new PdfWriter(result));
-//            copy.close();
-//			Document doc = new Document(pdfDoc);
-//
-//			int numberOfPages = pdfDoc.getNumberOfPages();
-//			for (int i = 1; i <= numberOfPages; i++) {
-//				// Write aligned text to the specified by parameters point
-//				doc.showTextAligned(new Paragraph(String.format("page %s of %s", i, numberOfPages)),
-//						559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
-//			}
-//			doc.close();
-//            return result.toByteArray();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            logger.error(e.getMessage());
-//            return null;
-//        }
-//    }
+                //final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+
+                imageDocument = new Document(copy, PageSize.A4);
+//                PdfWriter pdfWriter = PdfWriter.getInstance(imageDocument, byteStream);
+//                imageDocument.open();
+
+                // Create single page with the dimensions as source image and no margins:
+                Image image = new Image(ImageDataFactory.create(documents[i]));
+//                image.scaleToFit(550, 500);
+//                image.setAbsolutePosition(10, 300);
+                //imageDocument.add(new AreaBreak(AreaBreakType.NEXT_PAGE));
+                imageDocument.add(image);
+                copy.addNewPage(i+1);
+
+                //imageDocument.close();
+//                pdfReader = new PdfReader(byteStream.toByteArray());
+//                copy.addDocument(pdfReader);
+            }
+            imageDocument.close();
+            copy.close();
+            return result.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }
