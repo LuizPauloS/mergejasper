@@ -1,6 +1,7 @@
 package br.com.lsilva.mergejasperdemo.service;
 
 import com.itextpdf.io.font.constants.StandardFonts;
+import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
@@ -73,8 +74,14 @@ public class TesteService {
 //        return byteOutputStream.toByteArray();
         byte[] img = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI()));
         byte[] img2 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI()));
+        byte[] img3 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "brasao_ms.jpg").getURI()));
+        byte[] img4 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo.png").getURI()));
+        byte[] img5 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_governo.png").getURI()));
+        byte[] img6 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_imasul.jpg").getURI()));
+        byte[] img7 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "relatorio_logo.jpg").getURI()));
+        byte[] img8 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "teste.jpg").getURI()));
 
-        return merge(img, img2);
+        return merge(img, img2, img3, img4, img5, img6, img7, img8);
     }
 
     public byte[] createIndexPDF() throws Exception {
@@ -201,42 +208,36 @@ public class TesteService {
     }
 
     public byte[] merge(byte[]... documents) {
-        ByteArrayOutputStream result = null;
-        try {
-            result = new ByteArrayOutputStream();
-            PdfDocument copy = new PdfDocument(new PdfWriter(result));
-            Document imageDocument = null;
-//            for (byte[] document: documents) {
-                for(int i = 0; i <= documents.length; i++) {
+        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        PdfWriter pdfWriter = new PdfWriter(result);
+        PdfDocument copy = new PdfDocument(new PdfWriter(pdfWriter));
+        Document document = new Document(copy);
 
-//                InputStream is = new BufferedInputStream(new ByteArrayInputStream(document));
-//                String mimeType = URLConnection.guessContentTypeFromStream(is);
-//                PdfReader pdfReader = null;
+        float leftMargin = document.getLeftMargin(), rightMargin = document.getRightMargin();
+        float topMargin = document.getTopMargin(), bottomMargin = document.getBottomMargin();
+        float pdfA4usableWidth = PageSize.A4.getWidth() - leftMargin - rightMargin;
+        float pdfA4usableHeight = PageSize.A4.getHeight() - topMargin - bottomMargin;
 
-                //final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-
-                imageDocument = new Document(copy, PageSize.A4);
-//                PdfWriter pdfWriter = PdfWriter.getInstance(imageDocument, byteStream);
-//                imageDocument.open();
-
-                // Create single page with the dimensions as source image and no margins:
-                Image image = new Image(ImageDataFactory.create(documents[i]));
-//                image.scaleToFit(550, 500);
-//                image.setAbsolutePosition(10, 300);
-                //imageDocument.add(new AreaBreak(AreaBreakType.NEXT_PAGE));
-                imageDocument.add(image);
-                copy.addNewPage(i+1);
-
-                //imageDocument.close();
-//                pdfReader = new PdfReader(byteStream.toByteArray());
-//                copy.addDocument(pdfReader);
-            }
-            imageDocument.close();
-            copy.close();
-            return result.toByteArray();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+        for (int i = 0; i < documents.length; i++) {
+            ImageData imageData = ImageDataFactory.create(documents[i]);
+            Image image = new Image(imageData);
+//            image.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
+//            image.setFixedPosition(i+1, leftMargin, PageSize.A4.getHeight()-image.getImageScaledHeight()-topMargin);
+            image.scaleToFit(PageSize.A4.getWidth(), PageSize.A4.getHeight());
+            float x = (PageSize.A4.getWidth() - image.getImageScaledWidth()) / 2;
+            float y = (PageSize.A4.getHeight() - image.getImageScaledHeight()) / 2;
+            image.setFixedPosition(i+1, x, y);
+            document.add(image);
         }
+
+        int numberOfPages = copy.getNumberOfPages();
+        for (int i = 1; i <= numberOfPages; i++) {
+
+            // Write aligned text to the specified by parameters point
+            document.showTextAligned(new Paragraph(String.format("%s", i)),
+                    559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
+        }
+        document.close();
+        return result.toByteArray();
     }
 }
