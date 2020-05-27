@@ -221,9 +221,7 @@ public class TesteService {
         for (int i = 0; i < documents.length; i++) {
             ImageData imageData = ImageDataFactory.create(documents[i]);
             Image image = new Image(imageData);
-//            image.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
-//            image.setFixedPosition(i+1, leftMargin, PageSize.A4.getHeight()-image.getImageScaledHeight()-topMargin);
-            image.scaleToFit(PageSize.A4.getWidth(), PageSize.A4.getHeight());
+            image.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
             float x = (PageSize.A4.getWidth() - image.getImageScaledWidth()) / 2;
             float y = (PageSize.A4.getHeight() - image.getImageScaledHeight()) / 2;
             image.setFixedPosition(i+1, x, y);
@@ -232,8 +230,6 @@ public class TesteService {
 
         int numberOfPages = copy.getNumberOfPages();
         for (int i = 1; i <= numberOfPages; i++) {
-
-            // Write aligned text to the specified by parameters point
             document.showTextAligned(new Paragraph(String.format("%s", i)),
                     559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
         }
