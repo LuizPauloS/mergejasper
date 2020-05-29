@@ -18,7 +18,7 @@ public class TesteController {
 
     @GetMapping
     public ResponseEntity<?> getPdf() throws Exception {
-        byte[] documento = this.service.getPdfDocumentImage();
+        byte[] documento = this.service.manipulatePdf();
         HttpHeaders headers = new HttpHeaders();
         headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
         headers.add("Pragma", "no-cache");
