@@ -86,13 +86,15 @@ public class TesteService {
         PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
         PdfDocument pdfDoc = new PdfDocument(new PdfWriter(byteArrayOutputStream));
         Document document = new Document(pdfDoc);
+
         document.setTextAlignment(TextAlignment.JUSTIFIED)
                 .setFont(font)
                 .setFontSize(11);
         List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc = new ArrayList<>();
 
         // Parse text to PDF
-        createPdfWithOutlines(SRC, document, toc, bold);
+        //createPdfWithOutlines(SRC, document, toc, bold);
+        createPdfWithImagesOutlines(document, toc, bold);
 
         // Remove the main title from the table of contents list
         toc.remove(0);
@@ -131,7 +133,8 @@ public class TesteService {
     }
 
     private static void createPdfWithOutlines(String path, Document document,
-                                              List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc, PdfFont titleFont) throws Exception {
+                                              List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc,
+                                              PdfFont titleFont) throws Exception {
         PdfDocument pdfDocument = document.getPdfDocument();
 
         try (BufferedReader br = new BufferedReader(new FileReader(path))) {
@@ -143,7 +146,7 @@ public class TesteService {
                 Paragraph p = new Paragraph(line);
                 p.setKeepTogether(true);
                 if (title) {
-                    String name = String.format("title%02d", counter++);
+                    String name = String.format("image%02d", counter++);
                     outline = createOutline(outline, pdfDocument, line, name);
                     SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
                     p
@@ -175,10 +178,10 @@ public class TesteService {
     private static PdfOutline createOutline(PdfOutline outline, PdfDocument pdf, String title, String name) {
         if (outline == null) {
             outline = pdf.getOutlines(false);
-            outline = outline.addOutline(title);
+            outline = outline.addOutline(name);
             outline.addDestination(PdfDestination.makeDestination(new PdfString(name)));
         } else {
-            PdfOutline kid = outline.addOutline(title);
+            PdfOutline kid = outline.addOutline(name);
             kid.addDestination(PdfDestination.makeDestination(new PdfString(name)));
         }
 
@@ -198,6 +201,42 @@ public class TesteService {
             LayoutResult result = super.layout(layoutContext);
             entry.setValue(layoutContext.getArea().getPageNumber());
             return result;
+        }
+    }
+
+    private void createPdfWithImagesOutlines(Document document,
+                                       List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc,
+                                       PdfFont titleFont) throws Exception {
+        PdfDocument pdfDocument = document.getPdfDocument();
+        List<byte[]> images = getImagesFormat();
+            String line;
+            String name;
+            int counter = 0;
+            PdfOutline outline = null;
+            for (int i = 0; i < images.size(); i++) {
+                line = String.format("Teste %02d", i);
+                name = String.format("image%02d", counter++);
+
+                Paragraph p = new Paragraph();
+                p.setKeepTogether(true);
+                outline = createOutline(outline, pdfDocument, line, name);
+                SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
+                ImageData imageData = ImageDataFactory.create(images.get(i));
+                Image img = new Image(imageData);
+                //img.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
+                float x = (PageSize.A4.getWidth() - img.getImageScaledWidth()) / 2;
+                float y = (PageSize.A4.getHeight() - img.getImageScaledHeight()) / 2;
+                img.setFixedPosition(i+1, x, y);
+                //p.add(img);
+                p.setKeepWithNext(true).setDestination(name)
+                    // Add the current page number to the table of contents list
+                    .setNextRenderer(new UpdatePageRenderer(p, titlePage));
+                p.setMarginBottom(12);
+                document.add(p);
+                toc.add(new SimpleEntry(name, titlePage));
+                p.setFirstLineIndent(36);
+                p.setMarginBottom(0);
+                document.add(img);
         }
     }
 }
