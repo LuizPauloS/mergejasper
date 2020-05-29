@@ -223,7 +223,6 @@ public class TesteService {
                 SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
                 ImageData imageData = ImageDataFactory.create(images.get(i));
                 Image img = new Image(imageData);
-                //img.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
                 float x = (PageSize.A4.getWidth() - img.getImageScaledWidth()) / 2;
                 float y = (PageSize.A4.getHeight() - img.getImageScaledHeight()) / 2;
                 img.setFixedPosition(i+1, x, y);
