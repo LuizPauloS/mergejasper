@@ -22,6 +22,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -42,9 +43,8 @@ public class TesteService {
         byte[] img5 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_governo.png").getURI()));
         byte[] img6 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_imasul.jpg").getURI()));
         byte[] img7 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "relatorio_logo.jpg").getURI()));
-        byte[] img8 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "teste.jpg").getURI()));
 
-        return Arrays.asList(img, img2, img3, img4, img5, img6, img7, img8);
+        return Arrays.asList(img, img2, img3, img4, img5, img6, img7);
     }
 
     public byte[] getPdfDocumentImage() throws IOException {
@@ -60,6 +60,7 @@ public class TesteService {
         float pdfA4usableHeight = PageSize.A4.getHeight() - topMargin - bottomMargin;
 
         for (int i = 0; i < images.size(); i++) {
+
             ImageData imageData = ImageDataFactory.create(images.get(i));
             Image img = new Image(imageData);
             img.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
@@ -71,8 +72,10 @@ public class TesteService {
 
         int numberOfPages = copy.getNumberOfPages();
         for (int i = 1; i <= numberOfPages; i++) {
+            document.showTextAligned(new Paragraph("This is Image: " + i), 100, 806, i,
+                    TextAlignment.CENTER, VerticalAlignment.TOP, 0);
             // Write aligned text to the specified by parameters point
-            document.showTextAligned(new Paragraph(String.format("page %s of %s", i, numberOfPages)),
+            document.showTextAligned(new Paragraph(String.format("page %s", i)),
                     559, 806, i, TextAlignment.RIGHT, VerticalAlignment.TOP, 0);
         }
 
@@ -94,10 +97,10 @@ public class TesteService {
 
         // Parse text to PDF
         //createPdfWithOutlines(SRC, document, toc, bold);
-        createPdfWithImagesOutlines(document, toc, bold);
+        createPdfWithImagesOutlines(document, toc);
 
         // Remove the main title from the table of contents list
-        toc.remove(0);
+        //toc.remove(0);
 
         // Create table of contents
         document.add(new AreaBreak());
@@ -178,10 +181,10 @@ public class TesteService {
     private static PdfOutline createOutline(PdfOutline outline, PdfDocument pdf, String title, String name) {
         if (outline == null) {
             outline = pdf.getOutlines(false);
-            outline = outline.addOutline(name);
+            outline = outline.addOutline(title);
             outline.addDestination(PdfDestination.makeDestination(new PdfString(name)));
         } else {
-            PdfOutline kid = outline.addOutline(name);
+            PdfOutline kid = outline.addOutline(title);
             kid.addDestination(PdfDestination.makeDestination(new PdfString(name)));
         }
 
@@ -205,8 +208,7 @@ public class TesteService {
     }
 
     private void createPdfWithImagesOutlines(Document document,
-                                       List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc,
-                                       PdfFont titleFont) throws Exception {
+                                       List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc) throws Exception {
         PdfDocument pdfDocument = document.getPdfDocument();
         List<byte[]> images = getImagesFormat();
             String line;
@@ -219,23 +221,23 @@ public class TesteService {
 
                 Paragraph p = new Paragraph();
                 p.setKeepTogether(true);
-                outline = createOutline(outline, pdfDocument, line, name);
-                SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
                 ImageData imageData = ImageDataFactory.create(images.get(i));
                 Image img = new Image(imageData);
                 float x = (PageSize.A4.getWidth() - img.getImageScaledWidth()) / 2;
                 float y = (PageSize.A4.getHeight() - img.getImageScaledHeight()) / 2;
                 img.setFixedPosition(i+1, x, y);
-                //p.add(img);
+                outline = createOutline(outline, pdfDocument, line, name);
+                SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
+                img.setDestination(name);
                 p.setKeepWithNext(true).setDestination(name)
                     // Add the current page number to the table of contents list
                     .setNextRenderer(new UpdatePageRenderer(p, titlePage));
-                p.setMarginBottom(12);
+                //p.setMarginBottom(12);
+                document.add(img);
                 document.add(p);
                 toc.add(new SimpleEntry(name, titlePage));
                 p.setFirstLineIndent(36);
                 p.setMarginBottom(0);
-                document.add(img);
         }
     }
 }

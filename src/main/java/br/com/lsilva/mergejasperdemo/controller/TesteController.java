@@ -1,5 +1,6 @@
 package br.com.lsilva.mergejasperdemo.controller;
 
+import br.com.lsilva.mergejasperdemo.service.MergeWithTocService;
 import br.com.lsilva.mergejasperdemo.service.TesteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -15,10 +16,13 @@ public class TesteController {
 
     @Autowired
     private TesteService service;
+    @Autowired
+    private MergeWithTocService mergeWithTocService;
 
     @GetMapping
     public ResponseEntity<?> getPdf() throws Exception {
-        byte[] documento = this.service.manipulatePdf();
+        //byte[] documento = this.service.getPdfDocumentImage();
+        byte[] documento = this.mergeWithTocService.manipulatePdf();
         HttpHeaders headers = new HttpHeaders();
         headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
         headers.add("Pragma", "no-cache");
