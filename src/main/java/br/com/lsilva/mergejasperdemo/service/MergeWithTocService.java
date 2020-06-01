@@ -45,12 +45,9 @@ public class MergeWithTocService {
         return Arrays.asList(Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "hello.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "united_states.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "pdfteste.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "apostila.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Comunicado.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "cv.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "extrato.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "java8.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "lambdas.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "protocolo.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "prova.pdf").getURI())),
                 Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Matriz.pdf").getURI())));
@@ -67,14 +64,14 @@ public class MergeWithTocService {
         PdfPageFormCopier formCopier = new PdfPageFormCopier();
 
         // Copy all merging file's pages to the temporary pdf file
-        Map<String, PdfDocument> filesToMerge = initializeFilesToMerge();
+        Map<Integer, PdfDocument> filesToMerge = initializeFilesToMerge();
         Map<Integer, String> toc = new TreeMap<>();
         int page = 1;
-        for (Map.Entry<String, PdfDocument> entry : filesToMerge.entrySet()) {
+        for (Map.Entry<Integer, PdfDocument> entry : filesToMerge.entrySet()) {
             PdfDocument srcDoc = entry.getValue();
             int numberOfPages = srcDoc.getNumberOfPages();
 
-            toc.put(page, entry.getKey());
+            toc.put(page, "Teste " + entry.getKey());
 
             for (int i = 1; i <= numberOfPages; i++, page++) {
                 Text text = new Text(String.format("%d", page));
@@ -145,20 +142,20 @@ public class MergeWithTocService {
         return baos.toByteArray();
     }
 
-    private Map<String, PdfDocument> initializeFilesToMerge() throws Exception {
-        List<byte[]> pdfs = createListPdfImages();
-        pdfs.addAll(generatedCopyPDFExisting());
-        Map<String, PdfDocument> filesToMerge = new TreeMap<>();
-        int count = 0;
-        for (byte[] pdf: pdfs) {
-            filesToMerge.put("Teste " + count++, new PdfDocument(new PdfReader(
-                    new ByteArrayInputStream(pdf), new ReaderProperties())));
+    private Map<Integer, PdfDocument> initializeFilesToMerge() throws Exception {
+        List<byte[]> pdfs = createListPdfAndImages();
+        Map<Integer, PdfDocument> filesToMerge = new TreeMap<>();
+        for (int i = 0; i < pdfs.size(); i++) {
+            filesToMerge.put(i, new PdfDocument(new PdfReader(
+                    new ByteArrayInputStream(pdfs.get(i)), new ReaderProperties())));
         }
         return filesToMerge;
     }
 
-    private List<byte[]> createListPdfImages() throws Exception {
-        return getImagesFormat().stream().map(this::generatePdfDocumentImage).collect(Collectors.toList());
+    private List<byte[]> createListPdfAndImages() throws Exception {
+        List<byte[]> list = getImagesFormat().stream().map(this::generatePdfDocumentImage).collect(Collectors.toList());
+        list.addAll(generatedCopyPDFExisting());
+        return list;
     }
 
     private List<byte[]> generatedCopyPDFExisting() throws Exception {
