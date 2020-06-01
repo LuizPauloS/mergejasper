@@ -4,14 +4,10 @@ import com.itextpdf.forms.PdfPageFormCopier;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.geom.PageSize;
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfOutline;
-import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.PdfString;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.kernel.pdf.ReaderProperties;
+import com.itextpdf.kernel.pdf.*;
 import com.itextpdf.kernel.pdf.action.PdfAction;
 import com.itextpdf.kernel.pdf.canvas.draw.DashedLine;
+import com.itextpdf.kernel.pdf.canvas.draw.DottedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.*;
@@ -19,12 +15,13 @@ import com.itextpdf.layout.property.TabAlignment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
-import java.net.URLConnection;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
 import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,19 +32,28 @@ public class MergeWithTocService {
     public static final String PDF_SRC = "/templates/pdf/";
 
     public List<byte[]> getImagesFormat() throws IOException {
-        byte[] img = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI()));
-        byte[] img2 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI()));
-        byte[] img3 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "brasao_ms.jpg").getURI()));
-        byte[] img4 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo.png").getURI()));
-        byte[] img5 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_governo.png").getURI()));
-        byte[] img6 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_imasul.jpg").getURI()));
-        byte[] img7 = Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "relatorio_logo.jpg").getURI()));
-        return Arrays.asList(img, img2, img3, img4, img5, img6, img7);
+        return Arrays.asList(Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "brasao_ms.jpg").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo.png").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_governo.png").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_imasul.jpg").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "relatorio_logo.jpg").getURI())));
     }
 
-    public List<String> getPathPDFs() {
-        return Arrays.asList(new ClassPathResource(PDF_SRC + "hello.pdf").getPath(),
-                new ClassPathResource(PDF_SRC + "united_states.pdf").getPath());
+    public List<byte[]> getPathPDFs() throws IOException {
+        return Arrays.asList(Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "hello.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "united_states.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "pdfteste.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "apostila.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Comunicado.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "cv.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "extrato.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "java8.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "lambdas.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "protocolo.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "prova.pdf").getURI())),
+                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Matriz.pdf").getURI())));
     }
 
     public byte[] manipulatePdf() throws Exception {
@@ -141,7 +147,7 @@ public class MergeWithTocService {
 
     private Map<String, PdfDocument> initializeFilesToMerge() throws Exception {
         List<byte[]> pdfs = createListPdfImages();
-        //pdfs.addAll(generatedCopyPDFExisting());
+        pdfs.addAll(generatedCopyPDFExisting());
         Map<String, PdfDocument> filesToMerge = new TreeMap<>();
         int count = 0;
         for (byte[] pdf: pdfs) {
@@ -151,25 +157,12 @@ public class MergeWithTocService {
         return filesToMerge;
     }
 
-    public List<byte[]> createListPdfImages() throws Exception {
+    private List<byte[]> createListPdfImages() throws Exception {
         return getImagesFormat().stream().map(this::generatePdfDocumentImage).collect(Collectors.toList());
     }
 
-    public List<byte[]> generatedCopyPDFExisting() {
-        return getPathPDFs().stream().map(path -> {
-            try {
-                return generatedCopyPDFExisting(path);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return new byte[0];
-        }).collect(Collectors.toList());
-    }
-
-    public byte[] generatedCopyPDFExisting(String path) throws IOException {
-        ByteArrayOutputStream result = new ByteArrayOutputStream();
-        //TODO add PDFs on here
-        return result.toByteArray();
+    private List<byte[]> generatedCopyPDFExisting() throws Exception {
+        return new ArrayList<>(getPathPDFs());
     }
 
     public byte[] generatePdfDocumentImage(byte[] image) {

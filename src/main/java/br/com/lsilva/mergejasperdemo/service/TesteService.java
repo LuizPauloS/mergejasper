@@ -96,11 +96,11 @@ public class TesteService {
         List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc = new ArrayList<>();
 
         // Parse text to PDF
-        //createPdfWithOutlines(SRC, document, toc, bold);
-        createPdfWithImagesOutlines(document, toc);
+        createPdfWithOutlines(listPaths(), document, toc, bold);
+        //createPdfWithImagesOutlines(document, toc);
 
         // Remove the main title from the table of contents list
-        //toc.remove(0);
+        toc.remove(0);
 
         // Create table of contents
         document.add(new AreaBreak());
@@ -135,44 +135,52 @@ public class TesteService {
         return byteArrayOutputStream.toByteArray();
     }
 
-    private static void createPdfWithOutlines(String path, Document document,
+    private List<String> listPaths() {
+        return Arrays.asList(SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC, SRC,
+                SRC, SRC, SRC, SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC,
+                SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC,SRC, SRC, SRC);
+    }
+
+    private static void createPdfWithOutlines(List<String> paths, Document document,
                                               List<SimpleEntry<String, SimpleEntry<String, Integer>>> toc,
                                               PdfFont titleFont) throws Exception {
         PdfDocument pdfDocument = document.getPdfDocument();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
-            String line;
-            boolean title = true;
-            int counter = 0;
-            PdfOutline outline = null;
-            while ((line = br.readLine()) != null) {
-                Paragraph p = new Paragraph(line);
-                p.setKeepTogether(true);
-                if (title) {
-                    String name = String.format("image%02d", counter++);
-                    outline = createOutline(outline, pdfDocument, line, name);
-                    SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
-                    p
-                            .setFont(titleFont)
-                            .setFontSize(12)
-                            .setKeepWithNext(true)
-                            .setDestination(name)
+        for (String path: paths) {
+            try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+                String line;
+                boolean title = true;
+                int counter = 0;
+                PdfOutline outline = null;
+                while ((line = br.readLine()) != null) {
+                    Paragraph p = new Paragraph(line);
+                    p.setKeepTogether(true);
+                    if (title) {
+                        String name = String.format("image%02d", counter++);
+                        outline = createOutline(outline, pdfDocument, line, name);
+                        SimpleEntry<String, Integer> titlePage = new SimpleEntry(line, pdfDocument.getNumberOfPages());
+                        p
+                                .setFont(titleFont)
+                                .setFontSize(12)
+                                .setKeepWithNext(true)
+                                .setDestination(name)
 
-                            // Add the current page number to the table of contents list
-                            .setNextRenderer(new UpdatePageRenderer(p, titlePage));
-                    document.add(p);
-                    toc.add(new SimpleEntry(name, titlePage));
-                    title = false;
-                } else {
-                    p.setFirstLineIndent(36);
-                    if (line.isEmpty()) {
-                        p.setMarginBottom(12);
-                        title = true;
+                                // Add the current page number to the table of contents list
+                                .setNextRenderer(new UpdatePageRenderer(p, titlePage));
+                        document.add(p);
+                        toc.add(new SimpleEntry(name, titlePage));
+                        title = false;
                     } else {
-                        p.setMarginBottom(0);
-                    }
+                        p.setFirstLineIndent(36);
+                        if (line.isEmpty()) {
+                            p.setMarginBottom(12);
+                            title = true;
+                        } else {
+                            p.setMarginBottom(0);
+                        }
 
-                    document.add(p);
+                        document.add(p);
+                    }
                 }
             }
         }
