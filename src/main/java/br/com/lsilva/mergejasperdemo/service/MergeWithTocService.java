@@ -37,6 +37,7 @@ public class MergeWithTocService {
 
     @Autowired
     private ProcessoRepository repository;
+    private static final String SRC_JASPER = "/templates/pdf/";
 
     public byte[] manipulatePdf(Integer id) throws Exception {
         Optional<ProcessoDigital> optionalProcesso = this.repository.findById(id);
