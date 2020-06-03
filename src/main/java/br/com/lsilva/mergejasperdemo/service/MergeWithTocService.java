@@ -1,5 +1,8 @@
 package br.com.lsilva.mergejasperdemo.service;
 
+import br.com.lsilva.mergejasperdemo.model.Documento;
+import br.com.lsilva.mergejasperdemo.model.ProcessoDigital;
+import br.com.lsilva.mergejasperdemo.repository.ProcessoRepository;
 import com.itextpdf.forms.PdfPageFormCopier;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -11,12 +14,17 @@ import com.itextpdf.kernel.pdf.canvas.draw.DottedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.*;
+import com.itextpdf.layout.property.AreaBreakType;
 import com.itextpdf.layout.property.TabAlignment;
+import org.apache.commons.io.FilenameUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.print.Doc;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -27,35 +35,18 @@ import java.util.stream.Collectors;
 @Service
 public class MergeWithTocService {
 
-    public static final String SRC3 = "./src/main/resources/templates/pdf/toc.pdf";
-    public static final String IMG_SRC = "/templates/img/";
-    public static final String PDF_SRC = "/templates/pdf/";
+    @Autowired
+    private ProcessoRepository repository;
 
-    public List<byte[]> getImagesFormat() throws IOException {
-        return Arrays.asList(Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "cpf.jpg").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "rg.jpg").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "brasao_ms.jpg").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo.png").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_governo.png").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "logo_imasul.jpg").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(IMG_SRC + "relatorio_logo.jpg").getURI())));
-    }
+    public byte[] manipulatePdf(Integer id) throws Exception {
+        Optional<ProcessoDigital> optionalProcesso = this.repository.findById(id);
+        if (!optionalProcesso.isPresent()) {
+           throw new RuntimeException("Processo informado não encontrado na base de dados!");
+        }
 
-    public List<byte[]> getPathPDFs() throws IOException {
-        return Arrays.asList(Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "hello.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "united_states.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "pdfteste.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Comunicado.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "cv.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "extrato.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "protocolo.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "prova.pdf").getURI())),
-                Files.readAllBytes(Paths.get(new ClassPathResource(PDF_SRC + "Matriz.pdf").getURI())));
-    }
-
-    public byte[] manipulatePdf() throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfDocument pdfDoc = new PdfDocument(new PdfWriter(baos));
+        PdfWriter pdfWriter = new PdfWriter(baos, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
+        PdfDocument pdfDoc = new PdfDocument(pdfWriter);
         Document doc = new Document(pdfDoc);
 
         // Copier contains the additional logic to copy acroform fields to a new page.
@@ -64,38 +55,53 @@ public class MergeWithTocService {
         PdfPageFormCopier formCopier = new PdfPageFormCopier();
 
         // Copy all merging file's pages to the temporary pdf file
-        Map<Integer, PdfDocument> filesToMerge = initializeFilesToMerge();
+        Map<String, Map<String, PdfDocument>> filesToMerge = initializeFilesToMerge(optionalProcesso.get());
         Map<Integer, String> toc = new TreeMap<>();
         int page = 1;
-        for (Map.Entry<Integer, PdfDocument> entry : filesToMerge.entrySet()) {
-            PdfDocument srcDoc = entry.getValue();
-            int numberOfPages = srcDoc.getNumberOfPages();
+        for (Map.Entry<String, Map<String, PdfDocument>> entry : filesToMerge.entrySet()) {
+            //PdfDocument srcDoc = entry.getValue();
+            Map<String, PdfDocument> mapDocument = entry.getValue();
+            for (Map.Entry<String, PdfDocument> entryDocument : mapDocument.entrySet()) {
+                PdfDocument srcDoc = entryDocument.getValue();
+                int numberOfPages = srcDoc.getNumberOfPages();
 
-            toc.put(page, "Teste " + entry.getKey());
+                toc.put(page, entryDocument.getKey());
 
-            for (int i = 1; i <= numberOfPages; i++, page++) {
-                Text text = new Text(String.format("%d", page));
-                srcDoc.copyPagesTo(i, i, pdfDoc, formCopier);
+                for (int i = 1; i <= numberOfPages; i++, page++) {
+                    Text text = new Text(String.format("%d", page));
+                    srcDoc.copyPagesTo(i, i, pdfDoc, formCopier);
 
-                // Put the destination at the very first page of each merged document
-                if (i == 1) {
-                    text.setDestination("p" + page);
+                    // Put the destination at the very first page of each merged document
+                    if (i == 1) {
+                        text.setDestination("p" + page);
 
-                    PdfOutline rootOutLine = pdfDoc.getOutlines(false);
-                    PdfOutline outline = rootOutLine.addOutline("p" + page);
-                    outline.addDestination(PdfDestination.makeDestination(new PdfString("p" + page)));
+                        PdfOutline rootOutLine = pdfDoc.getOutlines(false);
+                        PdfOutline outline = rootOutLine.addOutline("p" + page);
+                        outline.addDestination(PdfDestination.makeDestination(new PdfString("p" + page)));
+                    }
+
+                    doc.add(new Paragraph(text)
+                            .setFixedPosition(page, 549, 810, 40)
+                            .setMargin(0)
+                            .setMultipliedLeading(1));
                 }
-
-                doc.add(new Paragraph(text)
-                        .setFixedPosition(page, 549, 810, 40)
-                        .setMargin(0)
-                        .setMultipliedLeading(1));
+            }
+            for (PdfDocument srcDoc : mapDocument.values()) {
+                srcDoc.close();
             }
         }
 
-        PdfDocument tocDoc = new PdfDocument(new PdfReader(SRC3));
-        tocDoc.copyPagesTo(1, 1, pdfDoc, formCopier);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(outputStream, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
+        writer.setCloseStream(false);
+        PdfDocument tocDoc = new PdfDocument(writer);
+        tocDoc.addNewPage();
         tocDoc.close();
+
+        tocDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(outputStream.toByteArray())));
+        tocDoc.copyPagesTo(1, tocDoc.getNumberOfPages(), pdfDoc, formCopier);
+        tocDoc.close();
+        outputStream.close();
 
         // Create a table of contents
         float tocYCoordinate = 750;
@@ -108,21 +114,14 @@ public class MergeWithTocService {
             p.add(new Tab());
             p.add(String.valueOf(entry.getKey()));
             p.setAction(PdfAction.createGoTo("p" + entry.getKey()));
-            doc.add(p
-                    .setFixedPosition(pdfDoc.getNumberOfPages(), tocXCoordinate, tocYCoordinate, tocWidth)
-                    .setMargin(0)
-                    .setMultipliedLeading(1));
-
+            doc.add(p.setFixedPosition(pdfDoc.getNumberOfPages(), tocXCoordinate, tocYCoordinate, tocWidth)
+                    .setMargin(0).setMultipliedLeading(1));
             tocYCoordinate -= 20;
-        }
-
-        for (PdfDocument srcDoc : filesToMerge.values()) {
-            srcDoc.close();
         }
 
         doc.close();
 
-        PdfDocument resultDoc = new PdfDocument(new PdfWriter(baos));
+        PdfDocument resultDoc = new PdfDocument(pdfWriter);
         PdfDocument srcDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(baos.toByteArray()),
                 new ReaderProperties()));
         srcDoc.initializeOutlines();
@@ -142,29 +141,67 @@ public class MergeWithTocService {
         return baos.toByteArray();
     }
 
-    private Map<Integer, PdfDocument> initializeFilesToMerge() throws Exception {
-        List<byte[]> pdfs = createListPdfAndImages();
-        Map<Integer, PdfDocument> filesToMerge = new TreeMap<>();
-        for (int i = 0; i < pdfs.size(); i++) {
-            filesToMerge.put(i, new PdfDocument(new PdfReader(
-                    new ByteArrayInputStream(pdfs.get(i)), new ReaderProperties())));
-        }
+    private Map<String, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
+        List<Documento> documentosPrioridade = processo.getDocumentos().stream()
+                .filter(this::isRepeitarPrioridade).collect(Collectors.toList());
+        List<Documento> documentosDataCriacao = processo.getDocumentos().stream()
+                .filter(this::isNaoRepeitarPrioridade).sorted(Comparator.comparing(Documento::getDataCriacao))
+                .collect(Collectors.toList());
+        TreeMap<String, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
+        //Adiciona na lista documentos com prioridade
+        addListDocumentsByPriority(documentosPrioridade, filesToMerge);
+        //Adiciona na lista documentos sem prioridade mas ordenado pela data criação
+        addListDocumentsByCreationDate(documentosDataCriacao, filesToMerge);
         return filesToMerge;
     }
 
-    private List<byte[]> createListPdfAndImages() throws Exception {
-        List<byte[]> list = getImagesFormat().stream().map(this::generatePdfDocumentImage).collect(Collectors.toList());
-        list.addAll(generatedCopyPDFExisting());
-        return list;
+    private void addListDocumentsByPriority(List<Documento> documents,
+                                            TreeMap<String, Map<String, PdfDocument>> filesToMerge) throws IOException {
+        for (int i = 0; i < documents.size(); i++) {
+            Map<String, PdfDocument> map = new HashMap<>();
+            byte[] doc = generatePdfDocumentImage(documents.get(i));
+            map.put(documents.get(i).getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
+            filesToMerge.put(filesToMerge.containsKey(documents.get(i).getPrioridade().toString()) ?
+                    documents.get(i).getPrioridade().toString().concat(".") + i : documents.get(i).getPrioridade().toString(), map);
+        }
     }
 
-    private List<byte[]> generatedCopyPDFExisting() throws Exception {
-        return new ArrayList<>(getPathPDFs());
+    private void addListDocumentsByCreationDate(List<Documento> documents,
+                                                TreeMap<String, Map<String, PdfDocument>> filesToMerge) throws IOException {
+        Integer lastKey = Integer.valueOf(FilenameUtils.getBaseName(filesToMerge.lastKey()));
+        if (!documents.isEmpty() && lastKey != null) {
+            for (Documento documento: documents) {
+                lastKey++;
+                Map<String, PdfDocument> map = new HashMap<>();
+                byte[] doc = generatePdfDocumentImage(documento);
+                map.put(documento.getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
+                filesToMerge.put(lastKey.toString(), map);
+            }
+        }
     }
 
-    public byte[] generatePdfDocumentImage(byte[] image) {
+    private boolean isRepeitarPrioridade(Documento documento) {
+        return !isNaoRepeitarPrioridade(documento);
+    }
+
+    private boolean isNaoRepeitarPrioridade(Documento documento) {
+        return !documento.isRespeitarPrioridade();
+    }
+
+    private byte[] generateByteDocumentPDF(String arquivo) throws IOException {
+        return Files.readAllBytes(new File(arquivo).toPath());
+    }
+
+    public byte[] generatePdfDocumentImage(Documento documento) throws IOException {
+        byte[] byteDocument = generateByteDocumentPDF(documento.getArquivo());
+
+        String extensao = FilenameUtils.getExtension(documento.getArquivo());
+        if (extensao != null && !(extensao.endsWith("png") || extensao.endsWith("jpg"))) {
+            return byteDocument;
+        }
+
         ByteArrayOutputStream result = new ByteArrayOutputStream();
-        PdfWriter pdfWriter = new PdfWriter(result);
+        PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
         PdfDocument copy = new PdfDocument(new PdfWriter(pdfWriter));
         Document document = new Document(copy);
 
@@ -173,7 +210,7 @@ public class MergeWithTocService {
         float pdfA4usableWidth = PageSize.A4.getWidth() - leftMargin - rightMargin;
         float pdfA4usableHeight = PageSize.A4.getHeight() - topMargin - bottomMargin;
 
-        ImageData imageData = ImageDataFactory.create(image);
+        ImageData imageData = ImageDataFactory.create(byteDocument);
         Image img = new Image(imageData);
         img.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
         float x = (PageSize.A4.getWidth() - img.getImageScaledWidth()) / 2;
