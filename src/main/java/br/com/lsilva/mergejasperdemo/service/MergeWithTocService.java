@@ -145,17 +145,34 @@ public class MergeWithTocService {
     }
 
     private Map<Double, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
+        TreeMap<Double, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
+        Map<String, PdfDocument> mapReqPadrao = new HashMap<>();
+        mapReqPadrao.put("Requerimento Padrão", new PdfDocument(new PdfReader(new ByteArrayInputStream(
+                generatePDF(SRC_JASPER + "requerimento-padrao.pdf")), new ReaderProperties())));
+        Map<String, PdfDocument> mapResTecnico = new HashMap<>();
+        mapResTecnico.put("Resumo Técnico da Atividade", new PdfDocument(new PdfReader(new ByteArrayInputStream(
+                generatePDF(SRC_JASPER + "resumo-tecnico.pdf")), new ReaderProperties())));
+        filesToMerge.put(1.0, mapReqPadrao);
+        filesToMerge.put(1.1, mapResTecnico);
         List<Documento> documentosPrioridade = processo.getDocumentos().stream()
                 .filter(this::isRepeitarPrioridade).collect(Collectors.toList());
         List<Documento> documentosDataCriacao = processo.getDocumentos().stream()
                 .filter(this::isNaoRepeitarPrioridade).sorted(Comparator.comparing(Documento::getDataCriacao))
                 .collect(Collectors.toList());
-        TreeMap<Double, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
         //Adiciona na lista documentos com prioridade
         addListDocumentsByPriority(documentosPrioridade, filesToMerge);
         //Adiciona na lista documentos sem prioridade mas ordenado pela data criação
         addListDocumentsByCreationDate(documentosDataCriacao, filesToMerge);
         return filesToMerge;
+    }
+
+    private byte[] generatePDF(String s) {
+        try {
+            return Files.readAllBytes(Paths.get(new ClassPathResource(s).getURI()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return new byte[0];
     }
 
     private void addListDocumentsByPriority(List<Documento> documents,
