@@ -146,14 +146,9 @@ public class MergeWithTocService {
 
     private Map<Double, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
         TreeMap<Double, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
-        Map<String, PdfDocument> mapReqPadrao = new HashMap<>();
-        mapReqPadrao.put("Requerimento Padrão", new PdfDocument(new PdfReader(new ByteArrayInputStream(
-                generatePDF(SRC_JASPER + "requerimento-padrao.pdf")), new ReaderProperties())));
-        Map<String, PdfDocument> mapResTecnico = new HashMap<>();
-        mapResTecnico.put("Resumo Técnico da Atividade", new PdfDocument(new PdfReader(new ByteArrayInputStream(
-                generatePDF(SRC_JASPER + "resumo-tecnico.pdf")), new ReaderProperties())));
-        filesToMerge.put(1.0, mapReqPadrao);
-        filesToMerge.put(1.1, mapResTecnico);
+        filesToMerge.put(1.0, addReport("Requerimento Padrão", SRC_JASPER + "requerimento-padrao.pdf"));
+        filesToMerge.put(1.1, addReport("Resumo Técnico da Atividade", SRC_JASPER + "resumo-tecnico.pdf"));
+        //Filtrando listas para iniciar ordenação
         List<Documento> documentosPrioridade = processo.getDocumentos().stream()
                 .filter(this::isRepeitarPrioridade).collect(Collectors.toList());
         List<Documento> documentosDataCriacao = processo.getDocumentos().stream()
@@ -164,6 +159,13 @@ public class MergeWithTocService {
         //Adiciona na lista documentos sem prioridade mas ordenado pela data criação
         addListDocumentsByCreationDate(documentosDataCriacao, filesToMerge);
         return filesToMerge;
+    }
+
+    private Map<String, PdfDocument> addReport(String nomeDocumento, String pathDocumento) throws IOException {
+        Map<String, PdfDocument> mapReqPadrao = new HashMap<>();
+        mapReqPadrao.put(nomeDocumento, new PdfDocument(new PdfReader(new ByteArrayInputStream(
+                generatePDF(pathDocumento)), new ReaderProperties())));
+        return mapReqPadrao;
     }
 
     private byte[] generatePDF(String s) {
