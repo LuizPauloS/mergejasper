@@ -56,10 +56,10 @@ public class MergeWithTocService {
         PdfPageFormCopier formCopier = new PdfPageFormCopier();
 
         // Copy all merging file's pages to the temporary pdf file
-        Map<String, Map<String, PdfDocument>> filesToMerge = initializeFilesToMerge(optionalProcesso.get());
+        Map<Double, Map<String, PdfDocument>> filesToMerge = initializeFilesToMerge(optionalProcesso.get());
         Map<Integer, String> toc = new TreeMap<>();
         int page = 1;
-        for (Map.Entry<String, Map<String, PdfDocument>> entry : filesToMerge.entrySet()) {
+        for (Map.Entry<Double, Map<String, PdfDocument>> entry : filesToMerge.entrySet()) {
             //PdfDocument srcDoc = entry.getValue();
             Map<String, PdfDocument> mapDocument = entry.getValue();
             for (Map.Entry<String, PdfDocument> entryDocument : mapDocument.entrySet()) {
@@ -142,13 +142,13 @@ public class MergeWithTocService {
         return baos.toByteArray();
     }
 
-    private Map<String, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
+    private Map<Double, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
         List<Documento> documentosPrioridade = processo.getDocumentos().stream()
                 .filter(this::isRepeitarPrioridade).collect(Collectors.toList());
         List<Documento> documentosDataCriacao = processo.getDocumentos().stream()
                 .filter(this::isNaoRepeitarPrioridade).sorted(Comparator.comparing(Documento::getDataCriacao))
                 .collect(Collectors.toList());
-        TreeMap<String, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
+        TreeMap<Double, Map<String, PdfDocument>> filesToMerge = new TreeMap<>();
         //Adiciona na lista documentos com prioridade
         addListDocumentsByPriority(documentosPrioridade, filesToMerge);
         //Adiciona na lista documentos sem prioridade mas ordenado pela data criação
@@ -157,26 +157,31 @@ public class MergeWithTocService {
     }
 
     private void addListDocumentsByPriority(List<Documento> documents,
-                                            TreeMap<String, Map<String, PdfDocument>> filesToMerge) throws IOException {
+                                            TreeMap<Double, Map<String, PdfDocument>> filesToMerge) throws IOException {
         for (int i = 0; i < documents.size(); i++) {
             Map<String, PdfDocument> map = new HashMap<>();
             byte[] doc = generatePdfDocumentImage(documents.get(i));
             map.put(documents.get(i).getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
-            filesToMerge.put(filesToMerge.containsKey(documents.get(i).getPrioridade().toString()) ?
-                    documents.get(i).getPrioridade().toString().concat(".") + i : documents.get(i).getPrioridade().toString(), map);
+            Double key = Double.valueOf(documents.get(i).getPrioridade());
+            filesToMerge.put(filesToMerge.containsKey(key) ? getKey(filesToMerge, key) : key, map);
         }
     }
 
+    private double getKey(TreeMap<Double, Map<String, PdfDocument>> filesToMerge, Double key) {
+        return filesToMerge.ceilingKey(key) != null ?
+                filesToMerge.higherKey(key) + 0.1D : key + 0.1D;
+    }
+
     private void addListDocumentsByCreationDate(List<Documento> documents,
-                                                TreeMap<String, Map<String, PdfDocument>> filesToMerge) throws IOException {
-        Integer lastKey = Integer.valueOf(FilenameUtils.getBaseName(filesToMerge.lastKey()));
+                                                TreeMap<Double, Map<String, PdfDocument>> filesToMerge) throws IOException {
+        Double lastKey = filesToMerge.lastKey();
         if (!documents.isEmpty() && lastKey != null) {
             for (Documento documento: documents) {
                 lastKey++;
                 Map<String, PdfDocument> map = new HashMap<>();
                 byte[] doc = generatePdfDocumentImage(documento);
                 map.put(documento.getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
-                filesToMerge.put(lastKey.toString(), map);
+                filesToMerge.put(lastKey, map);
             }
         }
     }
@@ -197,7 +202,7 @@ public class MergeWithTocService {
         byte[] byteDocument = generateByteDocumentPDF(documento.getArquivo());
 
         String extensao = FilenameUtils.getExtension(documento.getArquivo());
-        if (extensao != null && !(extensao.endsWith("png") || extensao.endsWith("jpg"))) {
+        if (extensao != null && !(extensao.equalsIgnoreCase("png") || extensao.equalsIgnoreCase("jpg"))) {
             return byteDocument;
         }
 

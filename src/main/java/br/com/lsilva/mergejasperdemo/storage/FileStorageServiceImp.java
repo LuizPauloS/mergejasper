@@ -15,7 +15,8 @@ import static java.nio.file.FileSystems.getDefault;
 @Component
 public class FileStorageServiceImp implements FileStorageService {
 
-    public static final String DEST = "C:/Users/lsilva/Documents/Projetos/uploads/";
+    private static final String DEST = "C:/Users/lsilva/Documents/Projetos/uploads/";
+    //private static final String DEST = "/home/luiz/Documentos/uploads/";
 
     public FileStorageServiceImp() {
         try {
