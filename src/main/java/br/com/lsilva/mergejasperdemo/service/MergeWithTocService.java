@@ -26,10 +26,12 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -160,16 +162,20 @@ public class MergeWithTocService {
                                             TreeMap<Double, Map<String, PdfDocument>> filesToMerge) throws IOException {
         for (int i = 0; i < documents.size(); i++) {
             Map<String, PdfDocument> map = new HashMap<>();
-            byte[] doc = generatePdfDocumentImage(documents.get(i));
+            final byte[] doc = generatePdfDocumentImage(documents.get(i));
             map.put(documents.get(i).getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
-            Double key = Double.valueOf(documents.get(i).getPrioridade());
+            final Double key = Double.valueOf(documents.get(i).getPrioridade());
             filesToMerge.put(filesToMerge.containsKey(key) ? getKey(filesToMerge, key) : key, map);
         }
     }
 
     private double getKey(TreeMap<Double, Map<String, PdfDocument>> filesToMerge, Double key) {
-        return filesToMerge.ceilingKey(key) != null ?
-                filesToMerge.higherKey(key) + 0.1D : key + 0.1D;
+        final List<Double> keys = filesToMerge.keySet().stream().filter(isKeyInRange(key)).collect(Collectors.toList());
+        return !keys.isEmpty() ? keys.stream().max(Double::compareTo).orElseThrow(NoSuchElementException::new) + 0.1D : key + 0.1D;
+    }
+
+    private Predicate<Double> isKeyInRange(Double key) {
+        return keyValue -> keyValue >= key && keyValue < (key + 1);
     }
 
     private void addListDocumentsByCreationDate(List<Documento> documents,
@@ -177,11 +183,10 @@ public class MergeWithTocService {
         Double lastKey = filesToMerge.lastKey();
         if (!documents.isEmpty() && lastKey != null) {
             for (Documento documento: documents) {
-                lastKey++;
                 Map<String, PdfDocument> map = new HashMap<>();
                 byte[] doc = generatePdfDocumentImage(documento);
                 map.put(documento.getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
-                filesToMerge.put(lastKey, map);
+                filesToMerge.put(lastKey++, map);
             }
         }
     }
