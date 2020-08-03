@@ -72,6 +72,7 @@ public class MergeWithTocService {
 
                 for (int i = 1; i <= numberOfPages; i++, page++) {
                     Text text = new Text(String.format("%d", page));
+                    srcDoc.getReader().setUnethicalReading(true);
                     srcDoc.copyPagesTo(i, i, pdfDoc, formCopier);
 
                     // Put the destination at the very first page of each merged document
