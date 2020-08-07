@@ -6,27 +6,30 @@ import br.com.lsilva.mergejasperdemo.repository.ProcessoRepository;
 import com.itextpdf.forms.PdfPageFormCopier;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.io.source.IRandomAccessSource;
+import com.itextpdf.io.source.RandomAccessSourceFactory;
 import com.itextpdf.kernel.geom.PageSize;
+import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.*;
 import com.itextpdf.kernel.pdf.action.PdfAction;
+import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.canvas.draw.DashedLine;
-import com.itextpdf.kernel.pdf.canvas.draw.DottedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
+import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.*;
-import com.itextpdf.layout.property.AreaBreakType;
 import com.itextpdf.layout.property.TabAlignment;
+import com.itextpdf.layout.property.TextAlignment;
+import com.itextpdf.layout.property.VerticalAlignment;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import javax.print.Doc;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -40,22 +43,34 @@ public class MergeWithTocService {
     @Autowired
     private ProcessoRepository repository;
     private static final String SRC_JASPER = "/templates/pdf/";
+    private static final String DEST = "./src/main/resources/temp/";
 
-    public byte[] manipulatePdf(Integer id) throws Exception {
+    public String verificaSeDiretorioLocalExiste(String numeroProcesso) {
+        String arquivoTemp = DEST + numeroProcesso + ".pdf";
+        File file = new File(arquivoTemp);
+        if (file.exists()) {
+            file.delete();
+        }
+        return arquivoTemp;
+    }
+
+    public File manipulatePdf(Integer id) throws Exception {
         Optional<ProcessoDigital> optionalProcesso = this.repository.findById(id);
+
         if (!optionalProcesso.isPresent()) {
            throw new RuntimeException("Processo informado não encontrado na base de dados!");
         }
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter pdfWriter = new PdfWriter(baos, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
-        PdfDocument pdfDoc = new PdfDocument(pdfWriter);
-        Document doc = new Document(pdfDoc);
+        String dest = verificaSeDiretorioLocalExiste(optionalProcesso.get().getNumeroProcesso());
+
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final PdfDocument pdfDoc = new PdfDocument(new PdfWriter(baos));
+        final Document doc = new Document(pdfDoc);
 
         // Copier contains the additional logic to copy acroform fields to a new page.
         // PdfPageFormCopier uses some caching logic which can potentially improve performance
         // in case of the reusing of the same instance.
-        PdfPageFormCopier formCopier = new PdfPageFormCopier();
+        final PdfPageFormCopier formCopier = new PdfPageFormCopier();
 
         // Copy all merging file's pages to the temporary pdf file
         Map<Double, Map<String, PdfDocument>> filesToMerge = initializeFilesToMerge(optionalProcesso.get());
@@ -65,7 +80,7 @@ public class MergeWithTocService {
             //PdfDocument srcDoc = entry.getValue();
             Map<String, PdfDocument> mapDocument = entry.getValue();
             for (Map.Entry<String, PdfDocument> entryDocument : mapDocument.entrySet()) {
-                PdfDocument srcDoc = entryDocument.getValue();
+                final PdfDocument srcDoc = entryDocument.getValue();
                 int numberOfPages = srcDoc.getNumberOfPages();
 
                 toc.put(page, entryDocument.getKey());
@@ -79,8 +94,8 @@ public class MergeWithTocService {
                     if (i == 1) {
                         text.setDestination("p" + page);
 
-                        PdfOutline rootOutLine = pdfDoc.getOutlines(false);
-                        PdfOutline outline = rootOutLine.addOutline("p" + page);
+                        final PdfOutline rootOutLine = pdfDoc.getOutlines(false);
+                        final PdfOutline outline = rootOutLine.addOutline("p" + page);
                         outline.addDestination(PdfDestination.makeDestination(new PdfString("p" + page)));
                     }
 
@@ -95,11 +110,17 @@ public class MergeWithTocService {
             }
         }
 
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PdfWriter writer = new PdfWriter(outputStream, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
-        writer.setCloseStream(false);
+        final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        final PdfWriter writer = new PdfWriter(outputStream, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
+        writer.setSmartMode(true);
         PdfDocument tocDoc = new PdfDocument(writer);
         tocDoc.addNewPage();
+        PdfPage pdfPage = tocDoc.getFirstPage();
+        Text titulo = new Text("Índice ").setBold();
+        PdfCanvas pdfCanvas = new PdfCanvas(pdfPage.newContentStreamBefore(), pdfPage.getResources(), tocDoc);
+        new Canvas(pdfCanvas, tocDoc, pdfPage.getPageSize())
+                .showTextAligned(titulo.getText(), 280, pdfPage.getPageSize().getTop() - 30, TextAlignment.CENTER,
+                        VerticalAlignment.TOP, 0);
         tocDoc.close();
 
         tocDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(outputStream.toByteArray())));
@@ -125,8 +146,8 @@ public class MergeWithTocService {
 
         doc.close();
 
-        PdfDocument resultDoc = new PdfDocument(pdfWriter);
-        PdfDocument srcDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(baos.toByteArray()),
+        final PdfDocument resultDoc = new PdfDocument(new PdfWriter(dest));
+        final PdfDocument srcDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(baos.toByteArray()),
                 new ReaderProperties()));
         srcDoc.initializeOutlines();
 
@@ -140,9 +161,12 @@ public class MergeWithTocService {
 
         srcDoc.copyPagesTo(copyPagesOrderList, resultDoc, formCopier);
 
+        writer.close();
         srcDoc.close();
         resultDoc.close();
-        return baos.toByteArray();
+        pdfDoc.close();
+        baos.close();
+        return new File(dest);
     }
 
     private Map<Double, Map<String, PdfDocument>> initializeFilesToMerge(ProcessoDigital processo) throws Exception {
@@ -164,8 +188,9 @@ public class MergeWithTocService {
 
     private Map<String, PdfDocument> addReport(String nomeDocumento, String pathDocumento) throws IOException {
         Map<String, PdfDocument> mapReqPadrao = new HashMap<>();
-        mapReqPadrao.put(nomeDocumento, new PdfDocument(new PdfReader(new ByteArrayInputStream(
-                generatePDF(pathDocumento)), new ReaderProperties())));
+        final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(generatePDF(pathDocumento));
+        mapReqPadrao.put(nomeDocumento, new PdfDocument(new PdfReader(byteArrayInputStream, new ReaderProperties())));
+        byteArrayInputStream.close();
         return mapReqPadrao;
     }
 
@@ -183,15 +208,19 @@ public class MergeWithTocService {
         for (int i = 0; i < documents.size(); i++) {
             Map<String, PdfDocument> map = new HashMap<>();
             final byte[] doc = generatePdfDocumentImage(documents.get(i));
-            map.put(documents.get(i).getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
+            final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(doc);
+            map.put(documents.get(i).getNome(), new PdfDocument(new PdfReader(byteArrayInputStream, new ReaderProperties())));
             final Double key = Double.valueOf(documents.get(i).getPrioridade());
             filesToMerge.put(filesToMerge.containsKey(key) ? getKey(filesToMerge, key) : key, map);
+            byteArrayInputStream.close();
         }
     }
 
     private double getKey(TreeMap<Double, Map<String, PdfDocument>> filesToMerge, Double key) {
-        final List<Double> keys = filesToMerge.keySet().stream().filter(isKeyInRange(key)).collect(Collectors.toList());
-        return !keys.isEmpty() ? keys.stream().max(Double::compareTo).orElseThrow(NoSuchElementException::new) + 0.1D : key + 0.1D;
+        final List<Double> keys = filesToMerge.keySet().stream()
+                .filter(isKeyInRange(key)).collect(Collectors.toList());
+        return !keys.isEmpty() ? keys.stream().max(Double::compareTo)
+                .orElseThrow(NoSuchElementException::new) + 0.1D : key + 0.1D;
     }
 
     private Predicate<Double> isKeyInRange(Double key) {
@@ -205,8 +234,10 @@ public class MergeWithTocService {
             for (Documento documento: documents) {
                 Map<String, PdfDocument> map = new HashMap<>();
                 byte[] doc = generatePdfDocumentImage(documento);
-                map.put(documento.getNome(), new PdfDocument(new PdfReader(new ByteArrayInputStream(doc), new ReaderProperties())));
+                final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(doc);
+                map.put(documento.getNome(), new PdfDocument(new PdfReader(byteArrayInputStream, new ReaderProperties())));
                 filesToMerge.put(lastKey++, map);
+                byteArrayInputStream.close();
             }
         }
     }
@@ -224,17 +255,47 @@ public class MergeWithTocService {
     }
 
     public byte[] generatePdfDocumentImage(Documento documento) throws IOException {
-        byte[] byteDocument = generateByteDocumentPDF(documento.getArquivo());
+        final byte[] byteDocument = generateByteDocumentPDF(documento.getArquivo());
 
         String extensao = FilenameUtils.getExtension(documento.getArquivo());
-        if (extensao != null && !(extensao.equalsIgnoreCase("png") || extensao.equalsIgnoreCase("jpg"))) {
-            return byteDocument;
+        if (extensao != null && !(extensao.equalsIgnoreCase("png") ||
+                extensao.equalsIgnoreCase("jpg"))) {
+            float percentage = 0.8f;
+            IRandomAccessSource source = new RandomAccessSourceFactory().createSource(byteDocument);
+            final ByteArrayOutputStream result = new ByteArrayOutputStream();
+            final PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
+            final PdfReader pdfReader = new PdfReader(source, new ReaderProperties());
+            pdfReader.setUnethicalReading(true);
+            pdfWriter.setCompressionLevel(9);
+            final PdfDocument copy = new PdfDocument(pdfReader, new PdfWriter(pdfWriter));
+            for (int p = 1; p <= copy.getNumberOfPages(); p++) {
+                PdfPage pdfPage = copy.getPage(p);
+                Rectangle pageSize = pdfPage.getPageSize();
+
+                // Applying the scaling in both X, Y direction to preserve the aspect ratio.
+                float offsetX = (pageSize.getWidth() * (1 - percentage)) / 2;
+                float offsetY = (pageSize.getHeight() * (1 - percentage)) / 2;
+
+                // The content, placed on a content stream before, will be rendered before the other content
+                // and, therefore, could be understood as a background (bottom "layer")
+                new PdfCanvas(pdfPage.newContentStreamBefore(), pdfPage.getResources(), copy)
+                        .writeLiteral(String.format(Locale.ENGLISH, "\nq %s 0 0 %s %s %s cm\nq\n",
+                                percentage, percentage, offsetX, offsetY));
+
+                // The content, placed on a content stream after, will be rendered after the other content
+                // and, therefore, could be understood as a foreground (top "layer")
+                new PdfCanvas(pdfPage.newContentStreamAfter(), pdfPage.getResources(), copy)
+                        .writeLiteral("\nQ\nQ\n");
+            }
+            pdfWriter.close();
+            copy.close();
+            return result.toByteArray();
         }
 
-        ByteArrayOutputStream result = new ByteArrayOutputStream();
-        PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
-        PdfDocument copy = new PdfDocument(new PdfWriter(pdfWriter));
-        Document document = new Document(copy);
+        final ByteArrayOutputStream result = new ByteArrayOutputStream();
+        final PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
+        final PdfDocument copy = new PdfDocument(new PdfWriter(pdfWriter));
+        final Document document = new Document(copy);
 
         float leftMargin = document.getLeftMargin(), rightMargin = document.getRightMargin();
         float topMargin = document.getTopMargin(), bottomMargin = document.getBottomMargin();
@@ -251,7 +312,7 @@ public class MergeWithTocService {
         document.add(img);
         document.close();
         copy.close();
-
+        pdfWriter.close();
         return result.toByteArray();
     }
 
