@@ -22,9 +22,9 @@ public class MergeWithToc3Service {
         file.getParentFile().mkdirs();
     }
 
-    public File manipulatePdf(String dest) throws Exception {
+    public File manipulatePdf() throws Exception {
         criaDiretorio();
-        PdfDocument pdfDoc = new PdfDocument(new PdfReader(SRC), new PdfWriter(dest));
+        PdfDocument pdfDoc = new PdfDocument(new PdfReader(SRC), new PdfWriter(DEST));
 
         // Please note that we don't change the page size in this example, but only shrink the content (in this case to 80%)
         // and the content is shrunk to center of the page, leaving bigger margins to the top, bottom, left and right
@@ -50,6 +50,6 @@ public class MergeWithToc3Service {
         }
 
         pdfDoc.close();
-        return new File(dest);
+        return new File(DEST);
     }
 }

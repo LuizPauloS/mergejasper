@@ -1,10 +1,8 @@
 package br.com.lsilva.mergejasperdemo.service;
 
 import com.itextpdf.forms.PdfPageFormCopier;
-import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.*;
 import com.itextpdf.kernel.pdf.action.PdfAction;
-import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.canvas.draw.DashedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
 import com.itextpdf.layout.Document;
@@ -79,6 +77,7 @@ public class MergeWithToc2Service {
 
         final PdfDocument tocDoc = new PdfDocument(new PdfReader(SRC3));
         tocDoc.copyPagesTo(1, 1, pdfDoc, formCopier);
+        tocDoc.getReader().close();
         tocDoc.close();
 
         // Create a table of contents
@@ -101,6 +100,7 @@ public class MergeWithToc2Service {
         }
 
         for (PdfDocument srcDoc : filesToMerge.values()) {
+            srcDoc.getReader().close();
             srcDoc.close();
         }
 

@@ -1,6 +1,7 @@
 package br.com.lsilva.mergejasperdemo.controller;
 
 import br.com.lsilva.mergejasperdemo.service.MergeWithTocService;
+import br.com.lsilva.mergejasperdemo.service.ReduceSizeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -23,9 +24,12 @@ public class TesteController {
     @Autowired
     private MergeWithTocService mergeWithTocService;
 
+    @Autowired
+    private ReduceSizeService reduceSizeService;
+
     @GetMapping("/{idProcesso}")
     public ResponseEntity<?> getPdf(@PathVariable("idProcesso") Integer id) throws Exception {
-        File documento = mergeWithTocService.manipulatePdf(id);
+        File documento = reduceSizeService.manipulatePdf();
         HttpHeaders header = new HttpHeaders();
         header.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + documento.getName());
         header.add("Cache-Control", "no-cache, no-store, must-revalidate");

@@ -15,9 +15,11 @@ import com.itextpdf.kernel.pdf.action.PdfAction;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
 import com.itextpdf.kernel.pdf.canvas.draw.DashedLine;
 import com.itextpdf.kernel.pdf.navigation.PdfDestination;
+import com.itextpdf.kernel.pdf.xobject.PdfImageXObject;
 import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.*;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.property.TabAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.VerticalAlignment;
@@ -26,6 +28,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -116,11 +122,11 @@ public class MergeWithTocService {
         PdfDocument tocDoc = new PdfDocument(writer);
         tocDoc.addNewPage();
         PdfPage pdfPage = tocDoc.getFirstPage();
-        Text titulo = new Text("Índice ").setBold();
+        Text titulo = new Text("Índice").setBold().setFontSize(16);
         PdfCanvas pdfCanvas = new PdfCanvas(pdfPage.newContentStreamBefore(), pdfPage.getResources(), tocDoc);
-        new Canvas(pdfCanvas, tocDoc, pdfPage.getPageSize())
-                .showTextAligned(titulo.getText(), 280, pdfPage.getPageSize().getTop() - 30, TextAlignment.CENTER,
-                        VerticalAlignment.TOP, 0);
+        new Canvas(pdfCanvas, pdfPage.getPageSize())
+                .showTextAligned(new Paragraph(titulo), 280, pdfPage.getPageSize().getTop() - 30,
+                        TextAlignment.CENTER, VerticalAlignment.TOP);
         tocDoc.close();
 
         tocDoc = new PdfDocument(new PdfReader(new ByteArrayInputStream(outputStream.toByteArray())));
@@ -260,60 +266,73 @@ public class MergeWithTocService {
         String extensao = FilenameUtils.getExtension(documento.getArquivo());
         if (extensao != null && !(extensao.equalsIgnoreCase("png") ||
                 extensao.equalsIgnoreCase("jpg"))) {
-            float percentage = 0.8f;
-            IRandomAccessSource source = new RandomAccessSourceFactory().createSource(byteDocument);
-            final ByteArrayOutputStream result = new ByteArrayOutputStream();
-            final PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
-            final PdfReader pdfReader = new PdfReader(source, new ReaderProperties());
-            pdfReader.setUnethicalReading(true);
-            pdfWriter.setCompressionLevel(9);
-            final PdfDocument copy = new PdfDocument(pdfReader, new PdfWriter(pdfWriter));
-            for (int p = 1; p <= copy.getNumberOfPages(); p++) {
-                PdfPage pdfPage = copy.getPage(p);
-                Rectangle pageSize = pdfPage.getPageSize();
-
-                // Applying the scaling in both X, Y direction to preserve the aspect ratio.
-                float offsetX = (pageSize.getWidth() * (1 - percentage)) / 2;
-                float offsetY = (pageSize.getHeight() * (1 - percentage)) / 2;
-
-                // The content, placed on a content stream before, will be rendered before the other content
-                // and, therefore, could be understood as a background (bottom "layer")
-                new PdfCanvas(pdfPage.newContentStreamBefore(), pdfPage.getResources(), copy)
-                        .writeLiteral(String.format(Locale.ENGLISH, "\nq %s 0 0 %s %s %s cm\nq\n",
-                                percentage, percentage, offsetX, offsetY));
-
-                // The content, placed on a content stream after, will be rendered after the other content
-                // and, therefore, could be understood as a foreground (top "layer")
-                new PdfCanvas(pdfPage.newContentStreamAfter(), pdfPage.getResources(), copy)
-                        .writeLiteral("\nQ\nQ\n");
-            }
-            pdfWriter.close();
-            copy.close();
-            return result.toByteArray();
+            return byteDocument;
         }
 
         final ByteArrayOutputStream result = new ByteArrayOutputStream();
-        final PdfWriter pdfWriter = new PdfWriter(result, new WriterProperties().setPdfVersion(PdfVersion.PDF_2_0));
-        final PdfDocument copy = new PdfDocument(new PdfWriter(pdfWriter));
-        final Document document = new Document(copy);
-
-        float leftMargin = document.getLeftMargin(), rightMargin = document.getRightMargin();
-        float topMargin = document.getTopMargin(), bottomMargin = document.getBottomMargin();
-        float pdfA4usableWidth = PageSize.A4.getWidth() - leftMargin - rightMargin;
-        float pdfA4usableHeight = PageSize.A4.getHeight() - topMargin - bottomMargin;
-
+        PdfWriter writer = new PdfWriter(result, new WriterProperties().setFullCompressionMode(true));
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        final Document document = new Document(pdfDoc);
         ImageData imageData = ImageDataFactory.create(byteDocument);
         Image img = new Image(imageData);
-        img.scaleToFit(pdfA4usableWidth, pdfA4usableHeight);
-        float x = (PageSize.A4.getWidth() - img.getImageScaledWidth()) / 2;
-        float y = (PageSize.A4.getHeight() - img.getImageScaledHeight()) / 2;
-        img.setFixedPosition(1, x, y);
-
         document.add(img);
         document.close();
-        copy.close();
-        pdfWriter.close();
+        float factor = 0.5f;
+
+        for (PdfIndirectReference indRef : pdfDoc.listIndirectReferences()) {
+
+            PdfObject pdfObject = indRef.getRefersTo();
+            if (pdfObject == null || !pdfObject.isStream()) {
+                continue;
+            }
+
+            PdfStream stream = (PdfStream) pdfObject;
+            if (!PdfName.Image.equals(stream.getAsName(PdfName.Subtype))) {
+                continue;
+            }
+
+            if (!PdfName.DCTDecode.equals(stream.getAsName(PdfName.Filter))) {
+                continue;
+            }
+
+            PdfImageXObject image = new PdfImageXObject(stream);
+            BufferedImage origImage = image.getBufferedImage();
+            if (origImage == null) {
+                continue;
+            }
+
+            int width = (int) (origImage.getWidth() * factor);
+            int height = (int) (origImage.getHeight() * factor);
+            if (width <= 0 || height <= 0) {
+                continue;
+            }
+
+            // Scale the image
+            BufferedImage resultImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            AffineTransform at = AffineTransform.getScaleInstance(factor, factor);
+            Graphics2D graphics = resultImage.createGraphics();
+            graphics.drawRenderedImage(origImage, at);
+            ByteArrayOutputStream scaledBitmapStream = new ByteArrayOutputStream();
+            ImageIO.write(resultImage, FilenameUtils.getExtension(documento.getArquivo()), scaledBitmapStream);
+
+            resetImageStream(stream, scaledBitmapStream.toByteArray(), width, height);
+            scaledBitmapStream.close();
+        }
+
+        //pdfDoc.close();
         return result.toByteArray();
+    }
+
+    private void resetImageStream(PdfStream stream, byte[] imgBytes, int imgWidth, int imgHeight){
+        stream.clear();
+        stream.setData(imgBytes);
+        stream.put(PdfName.Type, PdfName.XObject);
+        stream.put(PdfName.Subtype, PdfName.Image);
+        stream.put(PdfName.Filter, PdfName.DCTDecode);
+        stream.put(PdfName.Width, new PdfNumber(imgWidth));
+        stream.put(PdfName.Height, new PdfNumber(imgHeight));
+        stream.put(PdfName.BitsPerComponent, new PdfNumber(8));
+        stream.put(PdfName.ColorSpace, PdfName.DeviceRGB);
     }
 
 }
